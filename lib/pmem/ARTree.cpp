@@ -18,6 +18,7 @@
 #include <Logger.h>
 #include <daqdb/Types.h>
 #include <iostream>
+#include <algorithm>
 
 namespace DaqDB {
 #define LAYOUT "artree"
@@ -150,6 +151,47 @@ TreeImpl::TreeImpl(const string &path, const size_t size,
     }
 }
 
+// Simple calculation tree size with recursive DFS algorithm
+uint64_t TreeImpl::getTreeSize(persistent_ptr<Node> current)
+{
+    persistent_ptr<Node256> node256;
+    uint64_t size = 0;
+
+    if (current->type == TYPE256) {
+        // TYPE256
+        node256 = current;
+        for (int i = 0; i < 256; i++) {
+            if (node256->children[i])
+            size += getTreeSize(node256->children[i]);
+        }
+    }
+
+    // Count this node
+    size++;
+
+    return size;
+}
+
+uint8_t TreeImpl::getTreeDepth(persistent_ptr<Node> current)
+{
+    persistent_ptr<Node256> node256;
+    uint8_t depth = 0;
+
+    if (current->type == TYPE256) {
+        // TYPE256
+        node256 = current;
+        for (int i = 0; i < 256; i++) {
+            if (node256->children[i])
+                depth = std::max(getTreeDepth(node256->children[i]), depth);
+        }
+    }
+
+    // Count this node
+    depth++;
+
+    return depth;
+}
+
 void ARTree::Get(const char *key, int32_t keybytes, void **value, size_t *size,
                  uint8_t *location) {
     persistent_ptr<ValueWrapper> valPrstPtr;
@@ -191,6 +233,16 @@ void ARTree::Get(const char *key, void **value, size_t *size,
         throw OperationFailedException(Status(KEY_NOT_FOUND));
     }
     *size = val->size;
+}
+
+uint64_t ARTree::GetTreeSize()
+{
+    return tree->getTreeSize(tree->treeRoot->rootNode);
+}
+
+uint8_t ARTree::GetTreeDepth()
+{
+    return tree->getTreeDepth(tree->treeRoot->rootNode);
 }
 
 void ARTree::Put(const char *key, // copy value from std::string
